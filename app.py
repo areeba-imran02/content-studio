@@ -168,7 +168,7 @@ if go:
         start = time.time()
         try:
             with st.spinner("Agents kaam kar rahe hain… free tier me 2-5 minute lag sakte hain."):
-                                order = [MODELS[model_label]] + [m for m in MODELS.values() if m != MODELS[model_label]]
+                order = [MODELS[model_label]] + [m for m in MODELS.values() if m != MODELS[model_label]]
                 out = None
                 for n, mdl in enumerate(order):
                     state["done"] = 0
@@ -176,11 +176,11 @@ if go:
                     try:
                         out = run_studio(cfg, mdl, api_key, on_done)
                         break
-                    except Exception as e:
-                        busy = any(k in str(e) for k in ("503", "UNAVAILABLE", "high demand", "429"))
-                        if busy and n < len(order) - 1:
-                            st.toast("Model busy hai, dusra model try ho raha hai…")
-                            time.sleep(10)
+                    except Exception as e:  # noqa: BLE001
+                        retry = any(k in str(e) for k in ("503", "UNAVAILABLE", "high demand", "429", "404", "NOT_FOUND"))
+                        if retry and n < len(order) - 1:
+                            st.toast("Model available nahi / busy hai, dusra model try ho raha hai…")
+                            time.sleep(8)
                             continue
                         raise
             out.update(topic=topic, time=dt.datetime.now().strftime("%H:%M"),
@@ -191,11 +191,11 @@ if go:
             st.toast("Content package tayar hai! 🎉")
         except Exception as e:  # noqa: BLE001
             msg = str(e)
-                    except Exception as e:  # noqa: BLE001
-            msg = str(e)
             if "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg:
                 st.error("Gemini servers abhi busy hain. 1-2 minute baad dobara Generate dabayein.")
-            elif "429" in msg or "quota" in msg.lower() or "rate" in msg.lower():
+            elif "404" in msg or "NOT_FOUND" in msg:
+                st.error("Ye model ab available nahi. crew_setup.py ke MODELS dict me naya model naam daalein.")
+            elif "429" in msg or "quota" in msg.lower() or "rate limit" in msg.lower():
                 st.error("Gemini free-tier limit hit ho gayi. 1 minute ruk kar dobara try karein "
                          "ya sidebar se 'Flash-Lite' model chunein.")
             elif "API key" in msg or "401" in msg or "403" in msg or "invalid" in msg.lower():
