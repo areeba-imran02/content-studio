@@ -168,7 +168,21 @@ if go:
         start = time.time()
         try:
             with st.spinner("Agents kaam kar rahe hain… free tier me 2-5 minute lag sakte hain."):
-                out = run_studio(cfg, MODELS[model_label], api_key, on_done)
+                                order = [MODELS[model_label]] + [m for m in MODELS.values() if m != MODELS[model_label]]
+                out = None
+                for n, mdl in enumerate(order):
+                    state["done"] = 0
+                    holder.markdown(pipeline_html(labels, 0, 0), unsafe_allow_html=True)
+                    try:
+                        out = run_studio(cfg, mdl, api_key, on_done)
+                        break
+                    except Exception as e:
+                        busy = any(k in str(e) for k in ("503", "UNAVAILABLE", "high demand", "429"))
+                        if busy and n < len(order) - 1:
+                            st.toast("Model busy hai, dusra model try ho raha hai…")
+                            time.sleep(10)
+                            continue
+                        raise
             out.update(topic=topic, time=dt.datetime.now().strftime("%H:%M"),
                        seconds=int(time.time() - start), agents=len(labels))
             st.session_state.result = out
@@ -177,7 +191,11 @@ if go:
             st.toast("Content package tayar hai! 🎉")
         except Exception as e:  # noqa: BLE001
             msg = str(e)
-            if "429" in msg or "quota" in msg.lower() or "rate" in msg.lower():
+                    except Exception as e:  # noqa: BLE001
+            msg = str(e)
+            if "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg:
+                st.error("Gemini servers abhi busy hain. 1-2 minute baad dobara Generate dabayein.")
+            elif "429" in msg or "quota" in msg.lower() or "rate" in msg.lower():
                 st.error("Gemini free-tier limit hit ho gayi. 1 minute ruk kar dobara try karein "
                          "ya sidebar se 'Flash-Lite' model chunein.")
             elif "API key" in msg or "401" in msg or "403" in msg or "invalid" in msg.lower():
